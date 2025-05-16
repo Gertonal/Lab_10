@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Book Library MVC</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .table-container { margin-top: 20px; }
+        .form-container { margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 5px; }
+        .action-buttons { white-space: nowrap; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1 class="my-4">Book Library</h1>
+
+    <div class="table-container">
+        <table class="table table-striped table-bordered">
+            <thead class="table-dark">
+            <tr>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Publisher</th>
+                <th>Year</th>
+                <th>Pages</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody id="bookTableBody"></tbody>
+        </table>
+    </div>
+
+    <div class="form-container">
+        <h3 id="formTitle">Add New Book</h3>
+        <form id="bookForm">
+            <input type="hidden" id="bookId">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label for="title" class="form-label">Title</label>
+                    <input type="text" class="form-control" id="title" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="author" class="form-label">Author</label>
+                    <input type="text" class="form-control" id="author" required>
+                </div>
+                <div class="col-md-6">
+                    <label for="publisher" class="form-label">Publisher</label>
+                    <input type="text" class="form-control" id="publisher" required>
+                </div>
+                <div class="col-md-3">
+                    <label for="year" class="form-label">Year</label>
+                    <input type="number" class="form-control" id="year" required>
+                </div>
+                <div class="col-md-3">
+                    <label for="pages" class="form-label">Pages</label>
+                    <input type="number" class="form-control" id="pages" required>
+                </div>
+                <div class="col-12">
+                    <button type="submit" class="btn btn-primary" id="submitBtn">Add Book</button>
+                    <button type="button" class="btn btn-secondary" id="cancelBtn" style="display:none;">Cancel</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    $(document).ready(function() {
+        let isEditMode = false;
+        let currentBookId = null;
+
+        loadBooks();
+
+        $("#bookForm").submit(function(e) {
+            e.preventDefault();
+            const book = {
+                title: $("#title").val(),
+                author: $("#author").val(),
+                publisher: $("#publisher").val(),
+                year: parseInt($("#year").val()),
+                pages: parseInt($("#pages").val())
+            };
+
+            if (isEditMode) {
+                book.id = currentBookId;
+                updateBook(book);
+            } else {
+                addBook(book);
+            }
+        });
+
+        $("#cancelBtn").click(function() {
+            resetForm();
+        });
+
+        function loadBooks() {
+            $.ajax({
+                type: "GET",
+                url: "books",
+                success: renderBooks,
+                error: function(xhr) {
+                    console.error("Error loading books:", xhr.responseText);
+                }
+            });
+        }
+
+        function addBook(book) {
+            $.ajax({
+                type: "POST",
+                url: "books",
+                contentType: "application/json",
+                data: JSON.stringify(book),
+                success: function() {
+                    // После успешного добавления загружаем книги заново
+                    loadBooks();
+                    resetForm();
+                },
+                error: function(xhr) {
+                    console.error("Error adding book:", xhr.responseText);
+                }
+            });
+        }
+
+        function updateBook(book) {
+            $.ajax({
+                type: "PUT",
+                url: "books",
+                contentType: "application/json",
+                data: JSON.stringify(book),
+                success: function() {
+                    // После успешного обновления загружаем книги заново
+                    loadBooks();
+                    resetForm();
+                },
+                error: function(xhr) {
+                    console.error("Error updating book:", xhr.responseText);
+                }
+            });
+        }
+
+        function deleteBook(id) {
+            if (confirm("Are you sure you want to delete this book?")) {
+                $.ajax({
+                    type: "DELETE",
+                    url: "books/" + id,
+                    success: function(response) {
+                        loadBooks();
+                        resetForm();
+                        renderBooks(response);
+                    },
+                    error: function(xhr) {
+                        console.error("Error deleting book:", xhr.responseText);
+                    }
+                });
+            }
+        }
+
+        function editBook(book) {
+            isEditMode = true;
+            currentBookId = book.id;
+
+            $("#bookId").val(book.id);
+            $("#title").val(book.title);
+            $("#author").val(book.author);
+            $("#publisher").val(book.publisher);
+            $("#year").val(book.year);
+            $("#pages").val(book.pages);
+
+            $("#formTitle").text("Edit Book");
+            $("#submitBtn").text("Update Book");
+            $("#cancelBtn").show();
+        }
+
+        function resetForm() {
+            isEditMode = false;
+            currentBookId = null;
+
+            $("#bookForm")[0].reset();
+            $("#bookId").val("");
+
+            $("#formTitle").text("Add New Book");
+            $("#submitBtn").text("Add Book");
+            $("#cancelBtn").hide();
+        }
+
+        function renderBooks(books) {
+            const tbody = $("#bookTableBody");
+            tbody.empty();
+
+            if (books.length === 0) {
+                tbody.append('<tr><td colspan="6" class="text-center">No books found</td></tr>');
+                return;
+            }
+
+            books.forEach(book => {
+                tbody.append(`
+                <tr>
+                    <td>${book.title || ''}</td>
+                    <td>${book.author || ''}</td>
+                    <td>${book.publisher || ''}</td>
+                    <td>${book.year || ''}</td>
+                    <td>${book.pages || ''}</td>
+                    <td class="action-buttons">
+                        <button class="btn btn-sm btn-warning edit-btn" data-id="${book.id}">Edit</button>
+                        <button class="btn btn-sm btn-danger delete-btn" data-id="${book.id}">Delete</button>
+                    </td>
+                </tr>
+                `);
+            });
+
+            $(".edit-btn").click(function() {
+                const bookId = $(this).data("id");
+                const book = books.find(b => b.id == bookId);
+                if (book) editBook(book);
+            });
+
+            $(".delete-btn").click(function() {
+                const bookId = $(this).data("id");
+                deleteBook(bookId);
+            });
+        }
+    });
+</script>
+</body>
+</html>
